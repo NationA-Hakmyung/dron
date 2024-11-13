@@ -31,12 +31,12 @@
       document.body.appendChild(renderer.domElement);
 
       // 상수 정의
-      const DRONE_COUNT = 200;
-      const DRONE_START_DELAY = 150; // 드론 출발 간격
-      const FORMATION_TIME = 3000; // 형성 시간
-      const HOLD_TIME = 5000; // 유지 시간
-      const SCATTER_TIME = 2000; // 흩어지는 시간
-      const START_POSITION = { x: 50, y: 30, z: 50 }; // 시작 위치
+      const LETTER_SPACING = 15; // 글자 간격
+      const LETTER_HEIGHT = 20; // 글자 높이
+      const DRONE_SPACING = 2.0; // 드론 간격
+      const START_POSITION = { x: 50, y: -10, z: 50 }; // 시작 위치
+      const DRONE_START_DELAY = 200; // 드론 출발 간격
+      const FORMATION_TIME = 2000; // 이동 시간
 
       // Sky 설정
       const sky = new THREE.Sky();
@@ -55,24 +55,127 @@
       sun.setFromSphericalCoords(1, phi, theta);
       uniforms["sunPosition"].value.copy(sun);
 
-      // 상태 관리
-      const FormationState = {
-        INITIAL: "INITIAL", // 초기 상태
-        LAUNCHING: "LAUNCHING", // 드론 출발
-        STAR: "STAR", // 별 형성
-        HOLDING: "HOLDING", // 별 유지
-        SCATTER: "SCATTER", // 흩어짐
-        TEXT: "TEXT", // 텍스트 형성
-      };
+      // NATIONA 텍스트 포인트 생성
+      function createTextPoints() {
+        const points = [];
+        let currentX = -50; // 시작 X 위치
 
-      let currentState = FormationState.INITIAL;
-      let stateStartTime = 0;
+        // N 생성
+        function createN(x) {
+          for (let i = 0; i < 30; i++) {
+            const t = i / 29;
+            // 왼쪽 수직선
+            points.push({ x: x, y: t * LETTER_HEIGHT, z: 0 });
+            // 대각선
+            points.push({
+              x: x + t * LETTER_HEIGHT * 0.7,
+              y: t * LETTER_HEIGHT,
+              z: 0,
+            });
+            // 오른쪽 수직선
+            points.push({
+              x: x + LETTER_HEIGHT * 0.7,
+              y: t * LETTER_HEIGHT,
+              z: 0,
+            });
+          }
+        }
+
+        // A 생성
+        function createA(x) {
+          for (let i = 0; i < 25; i++) {
+            const t = i / 24;
+            // 왼쪽 사선
+            points.push({
+              x: x + t * LETTER_HEIGHT * 0.4,
+              y: t * LETTER_HEIGHT,
+              z: 0,
+            });
+            // 오른쪽 사선
+            points.push({
+              x: x + LETTER_HEIGHT * 0.8 - t * LETTER_HEIGHT * 0.4,
+              y: t * LETTER_HEIGHT,
+              z: 0,
+            });
+            // 가로줄
+            if (t > 0.4 && t < 0.6) {
+              points.push({
+                x: x + t * LETTER_HEIGHT * 0.8,
+                y: LETTER_HEIGHT * 0.5,
+                z: 0,
+              });
+            }
+          }
+        }
+
+        // T 생성
+        function createT(x) {
+          for (let i = 0; i < 20; i++) {
+            const t = i / 19;
+            // 가로줄
+            points.push({
+              x: x + t * LETTER_HEIGHT * 0.8,
+              y: LETTER_HEIGHT,
+              z: 0,
+            });
+            // 세로줄
+            points.push({
+              x: x + LETTER_HEIGHT * 0.4,
+              y: t * LETTER_HEIGHT,
+              z: 0,
+            });
+          }
+        }
+
+        // I 생성
+        function createI(x) {
+          for (let i = 0; i < 15; i++) {
+            const t = i / 14;
+            points.push({
+              x: x + LETTER_HEIGHT * 0.4,
+              y: t * LETTER_HEIGHT,
+              z: 0,
+            });
+          }
+        }
+
+        // O 생성
+        function createO(x) {
+          const radius = LETTER_HEIGHT * 0.4;
+          for (let i = 0; i < 25; i++) {
+            const angle = (i / 24) * Math.PI * 2;
+            points.push({
+              x: x + LETTER_HEIGHT * 0.4 + Math.cos(angle) * radius,
+              y: LETTER_HEIGHT * 0.5 + Math.sin(angle) * radius,
+              z: 0,
+            });
+          }
+        }
+
+        // NATIONA 생성
+        createN(currentX);
+        currentX += LETTER_SPACING;
+        createA(currentX);
+        currentX += LETTER_SPACING;
+        createT(currentX);
+        currentX += LETTER_SPACING;
+        createI(currentX);
+        currentX += LETTER_SPACING;
+        createO(currentX);
+        currentX += LETTER_SPACING;
+        createN(currentX);
+        currentX += LETTER_SPACING;
+        createA(currentX);
+
+        return points;
+      }
 
       // 드론 생성 함수
       function createDrone(index) {
         const droneGroup = new THREE.Group();
 
-        const bodyGeometry = new THREE.BoxGeometry(0.4, 0.08, 0.4);
+        // 드론 본체
+        const bodyGeometry = new THREE.BoxGeometry(0.5, 0.1, 0.5);
         const bodyMaterial = new THREE.MeshPhysicalMaterial({
           color: 0x2c3e50,
           metalness: 0.7,
@@ -83,7 +186,8 @@
         const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
         droneGroup.add(body);
 
-        const armGeometry = new THREE.BoxGeometry(0.08, 0.04, 1.0);
+        // 프로펠러 암
+        const armGeometry = new THREE.BoxGeometry(0.1, 0.05, 1.2);
         const armMaterial = new THREE.MeshPhysicalMaterial({ color: 0x34495e });
 
         const arm1 = new THREE.Mesh(armGeometry, armMaterial);
@@ -93,26 +197,27 @@
         droneGroup.add(arm1);
         droneGroup.add(arm2);
 
-        const propellerGeometry = new THREE.BoxGeometry(0.04, 0.01, 0.3);
+        // 프로펠러
+        const propellerGeometry = new THREE.BoxGeometry(0.05, 0.02, 0.4);
         const propellerMaterial = new THREE.MeshPhysicalMaterial({
           color: 0x95a5a6,
         });
 
         [
-          { x: 0.35, z: 0.35 },
-          { x: -0.35, z: 0.35 },
-          { x: 0.35, z: -0.35 },
-          { x: -0.35, z: -0.35 },
+          { x: 0.4, z: 0.4 },
+          { x: -0.4, z: 0.4 },
+          { x: 0.4, z: -0.4 },
+          { x: -0.4, z: -0.4 },
         ].forEach((pos) => {
           const propeller = new THREE.Mesh(
             propellerGeometry,
             propellerMaterial
           );
-          propeller.position.set(pos.x, 0.08, pos.z);
+          propeller.position.set(pos.x, 0.1, pos.z);
           droneGroup.add(propeller);
         });
 
-        // 초기 위치 설정: 오른쪽 구석에서 일렬로 정렬
+        // 초기 위치 설정
         droneGroup.position.set(
           START_POSITION.x,
           START_POSITION.y - index * 0.5,
@@ -123,70 +228,9 @@
         return droneGroup;
       }
 
-      // 별 모양 포인트 생성
-      function createStarPoints() {
-        const points = [];
-        const starRadius = 20;
-        const pointsPerArm = Math.floor(DRONE_COUNT / 5);
-
-        for (let arm = 0; arm < 5; arm++) {
-          const armAngle = (arm / 5) * Math.PI * 2;
-          for (let i = 0; i < pointsPerArm; i++) {
-            const t = i / pointsPerArm;
-            const radius = starRadius * (i % 2 === 0 ? 1 : 0.5);
-            points.push({
-              x: Math.cos(armAngle) * radius * t,
-              y: Math.sin(armAngle) * radius * t + 15,
-              z: 0,
-            });
-          }
-        }
-        return points;
-      }
-
-      // 흩어지는 포인트 생성
-      function createScatterPoints(count) {
-        return Array(count)
-          .fill()
-          .map(() => ({
-            x: (Math.random() - 0.5) * 80,
-            y: Math.random() * 40 + 10,
-            z: (Math.random() - 0.5) * 80,
-          }));
-      }
-
-      // Nation A 텍스트 포인트 생성
-      function createTextPoints() {
-        const points = [];
-        const letterSpacing = 12;
-        const letterHeight = 15;
-        const smallLetterHeight = letterHeight * 0.5;
-        let currentX = -40;
-
-        // N
-        for (let i = 0; i < 30; i++) {
-          const t = i / 29;
-          points.push({ x: currentX, y: t * letterHeight, z: 0 });
-          points.push({ x: currentX + t * 4, y: t * letterHeight, z: 0 });
-          points.push({ x: currentX + 4, y: t * letterHeight, z: 0 });
-        }
-        currentX += letterSpacing;
-
-        // ation
-        // ... [이전 코드의 나머지 글자 생성 로직]
-
-        return points;
-      }
-
-      // 드론과 포인트 생성
-      const drones = Array(DRONE_COUNT)
-        .fill()
-        .map((_, i) => createDrone(i));
-      const starPoints = createStarPoints();
-      const scatterPoints = createScatterPoints(DRONE_COUNT);
       const textPoints = createTextPoints();
+      const drones = textPoints.map((_, i) => createDrone(i));
 
-      // 드론 상태 초기화
       let droneStates = drones.map((_, index) => ({
         isMoving: false,
         progress: 0,
@@ -194,7 +238,6 @@
         arrived: false,
       }));
 
-      // 물결 효과 색상
       const waveColors = [
         0xff0000, 0xff7f00, 0xffff00, 0x00ff00, 0x0000ff, 0x4b0082, 0x9400d3,
       ];
@@ -203,41 +246,12 @@
       let propellerRotation = 0;
       let globalTime = 0;
 
-      function updateFormationState(currentTime) {
-        const totalLaunchTime = DRONE_COUNT * DRONE_START_DELAY;
-
-        if (currentState === FormationState.INITIAL && currentTime > 1000) {
-          currentState = FormationState.LAUNCHING;
-          stateStartTime = currentTime;
-        } else if (
-          currentState === FormationState.LAUNCHING &&
-          currentTime - stateStartTime > totalLaunchTime + FORMATION_TIME
-        ) {
-          currentState = FormationState.STAR;
-          stateStartTime = currentTime;
-        } else if (
-          currentState === FormationState.STAR &&
-          currentTime - stateStartTime > HOLD_TIME
-        ) {
-          currentState = FormationState.SCATTER;
-          stateStartTime = currentTime;
-        } else if (
-          currentState === FormationState.SCATTER &&
-          currentTime - stateStartTime > SCATTER_TIME
-        ) {
-          currentState = FormationState.TEXT;
-          stateStartTime = currentTime;
-        }
-      }
-
       function animate(currentTime) {
         requestAnimationFrame(animate);
 
         const deltaTime = lastTime ? currentTime - lastTime : 0;
         lastTime = currentTime;
         globalTime += deltaTime * 0.001;
-
-        updateFormationState(currentTime);
 
         // 프로펠러 회전
         propellerRotation += deltaTime * 0.01;
@@ -247,65 +261,59 @@
           });
         });
 
-        // 드론 이동 업데이트
+        // 드론 이동 및 물결 효과
         drones.forEach((drone, index) => {
-          let targetPoint;
-          let progress;
+          if (currentTime >= droneStates[index].startTime) {
+            const elapsed = currentTime - droneStates[index].startTime;
+            const progress = Math.min(1, elapsed / FORMATION_TIME);
 
-          switch (currentState) {
-            case FormationState.INITIAL:
-              return;
+            if (progress < 1) {
+              const targetPoint = textPoints[index];
+              const startPos = new THREE.Vector3(
+                START_POSITION.x,
+                START_POSITION.y - index * 0.5,
+                START_POSITION.z + index * 0.5
+              );
 
-            case FormationState.LAUNCHING:
-            case FormationState.STAR:
-              targetPoint = starPoints[index];
-              progress =
-                Math.max(0, currentTime - droneStates[index].startTime) /
-                FORMATION_TIME;
-              break;
+              // 베지어 곡선 제어점
+              const controlPoint = {
+                x: (startPos.x + targetPoint.x) / 2,
+                y: Math.max(startPos.y, targetPoint.y) + 10,
+                z: (startPos.z + targetPoint.z) / 2,
+              };
 
-            case FormationState.SCATTER:
-              targetPoint = scatterPoints[index];
-              progress = (currentTime - stateStartTime) / SCATTER_TIME;
-              break;
+              // 베지어 곡선 이동
+              const t = progress;
+              const mt = 1 - t;
+              drone.position.x =
+                mt * mt * startPos.x +
+                2 * mt * t * controlPoint.x +
+                t * t * targetPoint.x;
+              drone.position.y =
+                mt * mt * startPos.y +
+                2 * mt * t * controlPoint.y +
+                t * t * targetPoint.y;
+              drone.position.z =
+                mt * mt * startPos.z +
+                2 * mt * t * controlPoint.z +
+                t * t * targetPoint.z;
+            } else if (!droneStates[index].arrived) {
+              droneStates[index].arrived = true;
+              drone.position.set(
+                textPoints[index].x,
+                textPoints[index].y,
+                textPoints[index].z
+              );
+            }
 
-            case FormationState.TEXT:
-              targetPoint = textPoints[index % textPoints.length];
-              progress = (currentTime - stateStartTime) / FORMATION_TIME;
-              if (progress >= 1) {
-                const wavePhase = globalTime * 2 + index * 0.1;
-                const colorIndex =
-                  Math.floor((Math.sin(wavePhase) + 1) * 3.5) %
-                  waveColors.length;
-                drone.children[0].material.color.setHex(waveColors[colorIndex]);
-              }
-              break;
+            // 도착한 드론에 물결 효과 적용
+            if (droneStates[index].arrived) {
+              const wavePhase = globalTime * 2 + index * 0.1;
+              const colorIndex =
+                Math.floor((Math.sin(wavePhase) + 1) * 3.5) % waveColors.length;
+              drone.children[0].material.color.setHex(waveColors[colorIndex]);
+            }
           }
-
-          progress = Math.min(1, Math.max(0, progress));
-
-          const startPos = drone.position.clone();
-          const controlPoint = {
-            x: (startPos.x + targetPoint.x) / 2,
-            y: Math.max(startPos.y, targetPoint.y) + 10,
-            z: (startPos.z + targetPoint.z) / 2,
-          };
-
-          // 베지어 곡선 이동
-          const t = progress;
-          const mt = 1 - t;
-          drone.position.x =
-            mt * mt * startPos.x +
-            2 * mt * t * controlPoint.x +
-            t * t * targetPoint.x;
-          drone.position.y =
-            mt * mt * startPos.y +
-            2 * mt * t * controlPoint.y +
-            t * t * targetPoint.y;
-          drone.position.z =
-            mt * mt * startPos.z +
-            2 * mt * t * controlPoint.z +
-            t * t * targetPoint.z;
         });
 
         controls.update();
